@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime
 from microblog import app, db, Post, write_post, read_posts, read_post
-from microblog import list_view, perma_view, add_post
-from werkzeug.exceptions import NotFound
+import tempfile
+import os
 
 
 class TestWritePost(unittest.TestCase):
@@ -66,77 +66,107 @@ class TestReadPost(unittest.TestCase):
 
 class TestListPage(unittest.TestCase):
     def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
         db.create_all()
 
     def testEmpty(self):
         with app.test_request_context():
-            expected = ''
-            actual = list_view().split('div>')[1][:-2].strip()
-            self.assertEqual(expected, actual)
+            expected = 'No posts to display'
+            response = self.client.get('/').data
+            assert expected in response
 
     def testOne(self):
         with app.test_request_context():
             write_post(u"Post Title", u"A generic blog post")
-            expected = read_posts()[0].title
-            actual = list_view().split('h2>')[1][:-2]
-            self.assertEqual(expected, actual)
+            expected = ('Post Title', 'A generic blog post')
+            response = self.client.get('/').data
+            for elem in expected:
+                assert elem in response
 
     def testMany(self):
         with app.test_request_context():
             write_post(u"Post Number One", u"Some text that makes up blog post number one")
             write_post(u"Post Number Two", u"Some text that makes up blog post number two")
             write_post(u"Post Number Three", u"Some text that makes up blog post number three")
-            expected = [read_posts()[0].title, read_posts()[1].title, read_posts()[2].title]
-            actual = [list_view().split('h2>')[1][:-2], list_view().split('h2>')[3][:-2], list_view().split('h2>')[5][:-2]]
-            self.assertEqual(expected, actual)
+            expected = ('Post Number One', 'Post Number Two', 'Post Number Three', 'Some text')
+            response = self.client.get('/').data
+            for elem in expected:
+                assert elem in response
 
     def tearDown(self):
         db.session.remove()
         db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
 
 
 class TestPermaPage(unittest.TestCase):
     def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
         db.create_all()
 
     def testEmpty(self):
         with app.test_request_context():
-            with self.assertRaises(NotFound):
-                return perma_view(1)
+            expected = ('It seems as if', "that page isn't here")
+            response = self.client.get('/post/2').data
+            for elem in expected:
+                assert elem in response
 
     def testOne(self):
         with app.test_request_context():
             write_post(u"Single Post", u"Bloggity blog post, just one this time")
-            title = perma_view(1).split('h2>')[1][:-2]
-            self.assertEqual(u"Single Post", title)
+            expected = ('Single Post', 'Bloggity blog post, just one this time')
+            response = self.client.get('/post/1').data
+            for elem in expected:
+                assert elem in response
 
     def testMany(self):
         with app.test_request_context():
             write_post(u"Post One", u"The first blog post in a list")
             write_post(u"Post Two", u"The second blog post in a list")
             write_post(u"Post Three", u"The third blog post in a list")
-            title = perma_view(3).split('h2>')[1][:-2]
-            self.assertEqual(u"Post Three", title)
+            expected = ('Post Three', 'The third blog post in a list')
+            response = self.client.get('/post/3').data
+            for elem in expected:
+                assert elem in response
 
     def tearDown(self):
         db.session.remove()
         db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
 
 
 class TestAddPost(unittest.TestCase):
     def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
         db.create_all()
 
-    def withGet(self):
-        actual = add_post().count('input type="text"')
-        self.assertEqual(2, actual)
+    def testWithGet(self):
+        expected = 'input type="text"'
+        response = self.client.get('/new').data
+        assert expected in response
 
-    def withPost(self):
-        pass
+    def testWithPost(self):
+        expected = ('My Title', 'My Body')
+        response = self.client.post('/new', data=dict(
+            post_title='My Title',
+            post_body='My Body'
+            ), follow_redirects=True).data
+        for elem in expected:
+            assert elem in response
 
     def tearDown(self):
         db.session.remove()
         db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
 
 
 if __name__ == '__main__':
