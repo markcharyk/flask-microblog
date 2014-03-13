@@ -11,6 +11,7 @@ from flask.ext.bcrypt import Bcrypt
 app = Flask(__name__)
 app.testing = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///microblog'
+app.config['SECRET_KEY'] = "IllNeverTell"
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
@@ -18,8 +19,6 @@ migrate = Migrate(app, db)
 
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
-
-app.secret_key = "\x8c\x85p+\xe7\x08\x8e\x04y\xfa\xa9#\xael\xf1\x10\xa5\xc8\x96*\xd024A"
 
 
 class Post(db.Model):
@@ -59,14 +58,11 @@ def write_post(title, text):
 
 
 def read_posts():
-    result = []
-    for i in reversed(db.session.query(Post).all()):
-        result.append(i)
-    return result
+    return Post.query.order_by(Post.time.desc()).all()
 
 
 def read_post(id):
-    post = db.session.query(Post).filter_by(id=id).first()
+    post = Post.query.get(id)
     if post is not None:
         return post
     raise IndexError
@@ -89,8 +85,12 @@ def perma_view(id):
 @app.route('/new', methods=['GET', 'POST'])
 def add_post():
     if request.method == 'POST':
-        write_post(request.form['post_title'], request.form['post_body'])
-        return redirect(url_for('list_view'))
+        if session.get('logged_in', False):
+            write_post(request.form['post_title'], request.form['post_body'])
+            return redirect(url_for('list_view'))
+        else:
+            flash("You must be logged in to perform this action.")
+            return redirect(url_for('login'))
     return render_template('add_page.html')
 
 
@@ -99,19 +99,30 @@ def login():
     if request.method == 'POST':
         author = request.form['username']
         pw = request.form['password']
-        existing_author = Author.query().filter_by(username=author).first()
-        if bcrypt.check_password_hash(existing_author.password, pw):
-            session['username'] = author
-            return redirect(url_for('list_view'))
-        flash("Incorrect username/password. Please try again!")
-        return redirect(url_for('login'))
+        try:
+            login_user(author, pw)
+        except ValueError:
+            flash("Invalid username/password. Please try again.")
+            return redirect(url_for('login'))
+        flash("Now logged in as %s" % author)
+        return redirect(url_for('list_view'))
     return render_template('login_page.html')
+
+
+def login_user(username, password):
+    existing_author = Author.query.filter_by(username=username).first()
+    if existing_author is None:
+        raise ValueError
+    if not bcrypt.check_password_hash(existing_author.password, password):
+        raise ValueError
+    session['user'] = username
+    session['logged_in'] = True
 
 
 @app.route('/logout')
 def logout():
-    if request.method == 'POST':
-        session.pop('username', None)
+    session.pop('user', None)
+    session.pop('logged_in', None)
     return redirect(url_for('list_view'))
 
 
@@ -121,5 +132,8 @@ def page_not_found(error):
 
 
 if __name__ == '__main__':
-    # db.create_all()
-    manager.run()
+    db.create_all()
+    new_author = Author('newuser', 'secret')
+    db.session.add(new_author)
+    db.session.commit()
+    app.run()

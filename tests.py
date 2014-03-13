@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime
-from microblog import app, db, Post, write_post, read_posts, read_post
+from microblog import app, db, Post, Author, write_post, read_posts, read_post, login_user
+from flask import session
 import tempfile
 import os
 
@@ -132,7 +133,7 @@ class TestPermaPage(unittest.TestCase):
             expected = ('Post Three', 'The third blog post in a list')
             response = self.client.get('/post/3').data
             for elem in expected:
-                assert elem in response
+                self.assertIn(elem, response)
 
     def tearDown(self):
         db.session.remove()
@@ -149,18 +150,130 @@ class TestAddPost(unittest.TestCase):
         db.create_all()
 
     def testWithGet(self):
-        expected = 'input type="text"'
-        response = self.client.get('/new').data
-        assert expected in response
+        with app.test_request_context():
+            expected = 'input type="text"'
+            response = self.client.get('/new').data
+            assert expected in response
 
-    def testWithPost(self):
-        expected = ('My Title', 'My Body')
-        response = self.client.post('/new', data=dict(
-            post_title='My Title',
-            post_body='My Body'
-            ), follow_redirects=True).data
-        for elem in expected:
-            assert elem in response
+    def testPostNotLoggedIn(self):
+        expected = ('must be logged in', )
+        with app.test_request_context():
+            response = self.client.post('/new', data=dict(
+                post_title='My Title',
+                post_body='My Body'
+                ), follow_redirects=True).data
+            for elem in expected:
+                self.assertIn(elem, response)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestLogIn(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+
+    def testWithGet(self):
+        expected = (
+            'type="text" name="username"',
+            'type="password" name="password"'
+            )
+        with app.test_request_context():
+            response = self.client.get('/login').data
+            for elem in expected:
+                assert elem in response
+
+    def testWithUnknownUser(self):
+        expected = ("Invalid username/password", )
+        with app.test_request_context():
+            response = self.client.post('login', data=dict(
+                username='randomuser',
+                password='supersecure'
+                ), follow_redirects=True).data
+            for elem in expected:
+                assert elem in response
+
+    def testWithWrongPassword(self):
+        expected = ("Invalid username/password", )
+        with app.test_request_context():
+            response = self.client.post('/login', data=dict(
+                username='newuser',
+                password='secretsecret'
+                ), follow_redirects=True).data
+            for elem in expected:
+                assert elem in response
+
+    def testProperLogin(self):
+        expected = ("Now logged in as newuser",)
+        with app.test_request_context():
+            response = self.client.post('/login', data=dict(
+                username='newuser',
+                password='secret'
+                ), follow_redirects=True).data
+            for elem in expected:
+                self.assertIn(elem, response)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestLogInUser(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+
+    def testWithUnknownUser(self):
+        with app.test_request_context():
+            with self.assertRaises(ValueError):
+                login_user('randomuser', 'secret')
+            self.assertFalse(session.get('logged_in', False))
+
+    def testWithWrongPassword(self):
+        with app.test_request_context():
+            with self.assertRaises(ValueError):
+                login_user('newuser', 'secretsecret')
+            self.assertFalse(session.get('logged_in', False))
+
+    def testProperLogin(self):
+        with app.test_request_context():
+            login_user('newuser', 'secret')
+            self.assertTrue(session['logged_in'])
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestLogout(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+
+    def testLogOut(self):
+        with app.test_request_context():
+            self.client.get('logout')
+            self.assertFalse(session.get('logged_in', False))
 
     def tearDown(self):
         db.session.remove()

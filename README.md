@@ -1,5 +1,6 @@
 A simple microblog written as a means of practicing with the Flask framework.
-The functionalities so far are creating a post, reading those posts, and reading a specific post
+Includes functionality for writing a post, reading a post, reading a list of posts, and logging in as a user
+Credit to @lordsheepy for helping with the templates.
 
 Includes a unit testing file tests.py
 
