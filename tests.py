@@ -123,5 +123,21 @@ class TestPermaPage(unittest.TestCase):
         db.drop_all()
 
 
+class TestAddPost(unittest.TestCase):
+    def setUp(self):
+        db.create_all()
+
+    def withGet(self):
+        actual = add_post().count('input type="text"')
+        self.assertEqual(2, actual)
+
+    def withPost(self):
+        pass
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+
+
 if __name__ == '__main__':
     unittest.main()

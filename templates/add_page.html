@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block body %}
+    <form action="/new" method="POST">
+        Title: <input type="text" name="post_title"><br>
+        Body: <input type="text" name="post_body"><br>
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <input type="submit" name="Post!">
+    </form>
+{% endblock %}

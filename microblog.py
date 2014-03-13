@@ -3,23 +3,31 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask.ext.script import Manager
 from flask.ext.migrate import Migrate, MigrateCommand
-from flask import abort, render_template
+from flask import abort, request, render_template
+from flask import redirect, url_for, session, flash
+from flask.ext.seasurf import SeaSurf
+from flask.ext.bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.testing = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///microblog'
 db = SQLAlchemy(app)
+csrf = SeaSurf(app)
+bcrypt = Bcrypt(app)
 migrate = Migrate(app, db)
 
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 
+app.secret_key = "\x8c\x85p+\xe7\x08\x8e\x04y\xfa\xa9#\xael\xf1\x10\xa5\xc8\x96*\xd024A"
+
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(128))
+    title = db.Column(db.String(127))
     body = db.Column(db.Text)
     time = db.Column(db.DateTime)
+    author_id = db.Column(db.Integer, db.ForeignKey('author.id'))
 
     def __init__(self, title, body):
         self.title = title
@@ -30,8 +38,18 @@ class Post(db.Model):
         return '<Post %r>' % self.title
 
 
-# class User(db.Model):
-#     pass
+class Author(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(127))
+    password = db.Column(db.String(127))
+    posts = db.relationship('Post', backref='author')
+
+    def __init__(self, username, password):
+        self.username = username
+        self.password = bcrypt.generate_password_hash(password)
+
+    def __repr__(self):
+        return '<Author %r>' % self.username
 
 
 def write_post(title, text):
@@ -68,9 +86,33 @@ def perma_view(id):
         abort(404)
 
 
-@app.route('/new')
+@app.route('/new', methods=['GET', 'POST'])
 def add_post():
-    pass
+    if request.method == 'POST':
+        write_post(request.form['post_title'], request.form['post_body'])
+        return redirect(url_for('list_view'))
+    return render_template('add_page.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        author = request.form['username']
+        pw = request.form['password']
+        existing_author = Author.query().filter_by(username=author).first()
+        if bcrypt.check_password_hash(existing_author.password, pw):
+            session['username'] = author
+            return redirect(url_for('list_view'))
+        flash("Incorrect username/password. Please try again!")
+        return redirect(url_for('login'))
+    return render_template('login_page.html')
+
+
+@app.route('/logout')
+def logout():
+    if request.method == 'POST':
+        session.pop('username', None)
+    return redirect(url_for('list_view'))
 
 
 @app.errorhandler(404)
