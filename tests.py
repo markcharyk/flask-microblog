@@ -151,9 +151,10 @@ class TestAddPost(unittest.TestCase):
 
     def testWithGet(self):
         with app.test_request_context():
-            expected = 'input type="text"'
+            expected1 = 'input type="text"'
+            expected2 = "Haven't registered"
             response = self.client.get('/new').data
-            assert expected in response
+            assert expected1 in response or expected2 in response
 
     def testPostNotLoggedIn(self):
         expected = ('must be logged in', )

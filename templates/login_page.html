@@ -1,15 +1,9 @@
 {% extends "layout.html" %}
 {% block body %}
-{% if session.logged_in %}
     <form action="/login" method="POST">
         Username: <input type="text" name="username"><br>
         Password: <input type="password" name="password"><br>
         <input type="submit" name="Login">
     </form>
-{% else %}
-<p>You must be logged in to perform this action</p>
-<a href='/login'>Log in</a>
-<a href='/register'>Haven't subscribed to this blog? Why the heck not? Register here.</a>
-{% endif %}
 <a href="/">Home</a>
 {% endblock %}

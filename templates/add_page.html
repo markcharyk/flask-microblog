@@ -1,9 +1,16 @@
 {% extends "layout.html" %}
 {% block body %}
+{% if session.logged_in %}
     <form action="/new" method="POST">
         Title: <input type="text" name="post_title"><br>
         Body: <input type="text" name="post_body"><br>
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <input type="submit" name="Post!">
     </form>
+{% else %}
+<p>You must be logged in to perform this action</p>
+<a href='/login'>Log in</a>
+<a href='/register'>Haven't registered for this blog? Why the heck not? Register here.</a>
+{% endif %}
+<a href='/'>Home</a>
 {% endblock %}
