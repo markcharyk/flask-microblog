@@ -2,13 +2,13 @@ language: python
 python:
   - "2.7"
 env: DB=postgres
+env: BLOG_SETTINGS=/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/flask/testing/config.py
 # command to install dependencies
 install: 
     - pip install -r requirements.txt
 # commands before running tests
 before_script:
   - psql -c 'create database microblog;' -U postgres
-  - export BLOG_SETTINGS=/home/travis/virtualenv/python2.7/local/lib/python2.7/site-packages/flask/testing/config.py
 # command to run tests
 script:
     - python tests.py
