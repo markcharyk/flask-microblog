@@ -1,24 +1,29 @@
 import unittest
-from datetime import datetime
-from microblog import app, db, Post, Author, write_post, read_posts, read_post, login_user
+from microblog import app, db, Post, Author, TempAuthor
+from microblog import write_post, read_posts, read_post
+from microblog import login_user, register_user, send_email, mail, un_temp_user
 from flask import session
 import tempfile
 import os
+os.environ['FLASK_MODE'] = os.getenv('FLASK_MODE') or 'testing'
 
 
 class TestWritePost(unittest.TestCase):
     def setUp(self):
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testWriteOne(self):
         expected = Post(u"First Post", u"""
-            The text containing the first post in the blog.""")
+            The text containing the first post in the blog.""", self.auth_id)
         write_post(u"First Post", u"""
-            The text containing the first post in the blog.""")
-        actual = db.session.query(Post).filter_by(title=u'First Post').first()
+            The text containing the first post in the blog.""", self.auth_id)
+        actual = Post.query.filter_by(title=u'First Post').first()
         self.assertEqual(expected.title, actual.title)
         self.assertEqual(expected.body, actual.body)
-        self.assertIsInstance(actual.time, datetime)
 
     def tearDown(self):
         db.session.remove()
@@ -28,16 +33,20 @@ class TestWritePost(unittest.TestCase):
 class TestReadPosts(unittest.TestCase):
     def setUp(self):
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testReadOne(self):
         expected = Post(u"New Post", u"""
-            The text containing the newest post in the blog.""")
+            The text containing the newest post in the blog.""", self.auth_id)
         write_post(u"New Post", u"""
-            The text containing the newest post in the blog.""")
+            The text containing the newest post in the blog.""", self.auth_id)
         actual = read_posts()[0]
         self.assertEqual(expected.title, actual.title)
         self.assertEqual(expected.body, actual.body)
-        self.assertIsInstance(actual.time, datetime)
+        self.assertEqual(self.auth_id, actual.author_id)
 
     def testEmpty(self):
         self.assertEqual(len(read_posts()), 0)
@@ -50,6 +59,10 @@ class TestReadPosts(unittest.TestCase):
 class TestReadPost(unittest.TestCase):
     def setUp(self):
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testEmpty(self):
         with self.assertRaises(IndexError):
@@ -57,7 +70,7 @@ class TestReadPost(unittest.TestCase):
 
     def testFirst(self):
         write_post(u"Newer Post", u"""
-            The text containing the newer post in the blog.""")
+            The text containing the newer post in the blog.""", self.auth_id)
         self.assertIsInstance(read_post(1), Post)
 
     def tearDown(self):
@@ -71,6 +84,10 @@ class TestListPage(unittest.TestCase):
         app.config['TESTING'] = True
         self.client = app.test_client()
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testEmpty(self):
         with app.test_request_context():
@@ -80,7 +97,7 @@ class TestListPage(unittest.TestCase):
 
     def testOne(self):
         with app.test_request_context():
-            write_post(u"Post Title", u"A generic blog post")
+            write_post(u"Post Title", u"A generic blog post", self.auth_id)
             expected = ('Post Title', 'A generic blog post')
             response = self.client.get('/').data
             for elem in expected:
@@ -88,9 +105,9 @@ class TestListPage(unittest.TestCase):
 
     def testMany(self):
         with app.test_request_context():
-            write_post(u"Post Number One", u"Some text that makes up blog post number one")
-            write_post(u"Post Number Two", u"Some text that makes up blog post number two")
-            write_post(u"Post Number Three", u"Some text that makes up blog post number three")
+            write_post(u"Post Number One", u"Some text that makes up blog post number one", self.auth_id)
+            write_post(u"Post Number Two", u"Some text that makes up blog post number two", self.auth_id)
+            write_post(u"Post Number Three", u"Some text that makes up blog post number three", self.auth_id)
             expected = ('Post Number One', 'Post Number Two', 'Post Number Three', 'Some text')
             response = self.client.get('/').data
             for elem in expected:
@@ -109,6 +126,10 @@ class TestPermaPage(unittest.TestCase):
         app.config['TESTING'] = True
         self.client = app.test_client()
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testEmpty(self):
         with app.test_request_context():
@@ -119,7 +140,7 @@ class TestPermaPage(unittest.TestCase):
 
     def testOne(self):
         with app.test_request_context():
-            write_post(u"Single Post", u"Bloggity blog post, just one this time")
+            write_post(u"Single Post", u"Bloggity blog post, just one this time", self.auth_id)
             expected = ('Single Post', 'Bloggity blog post, just one this time')
             response = self.client.get('/post/1').data
             for elem in expected:
@@ -127,9 +148,9 @@ class TestPermaPage(unittest.TestCase):
 
     def testMany(self):
         with app.test_request_context():
-            write_post(u"Post One", u"The first blog post in a list")
-            write_post(u"Post Two", u"The second blog post in a list")
-            write_post(u"Post Three", u"The third blog post in a list")
+            write_post(u"Post One", u"The first blog post in a list", self.auth_id)
+            write_post(u"Post Two", u"The second blog post in a list", self.auth_id)
+            write_post(u"Post Three", u"The third blog post in a list", self.auth_id)
             expected = ('Post Three', 'The third blog post in a list')
             response = self.client.get('/post/3').data
             for elem in expected:
@@ -148,6 +169,10 @@ class TestAddPost(unittest.TestCase):
         app.config['TESTING'] = True
         self.client = app.test_client()
         db.create_all()
+        new_author = Author('newuser', 'secret')
+        db.session.add(new_author)
+        db.session.commit()
+        self.auth_id = new_author.id
 
     def testWithGet(self):
         with app.test_request_context():
@@ -275,6 +300,294 @@ class TestLogout(unittest.TestCase):
         with app.test_request_context():
             self.client.get('logout')
             self.assertFalse(session.get('logged_in', False))
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestRegister(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        new_author = Author('admin', 'admin')
+        db.session.add(new_author)
+        temp_author = TempAuthor('temp', 'admin')
+        db.session.add(temp_author)
+        db.session.commit()
+
+    def testGet(self):
+        expected = ('Confirm Password:', "Email Address:")
+        with app.test_request_context():
+            response = self.client.get('/register').data
+            for elem in expected:
+                self.assertIn(elem, response)
+
+    def testBlankForms(self):
+        expected = (
+            'password is missing',
+            'username is missing',
+            'email address is missing'
+            )
+        with app.test_request_context():
+            response = []
+            response.append(self.client.post('/register', data=dict(
+                username='newuser',
+                password='',
+                password_2='',
+                email='newuser@domain.com'
+                ), follow_redirects=True).data)
+            response.append(self.client.post('/register', data=dict(
+                username='',
+                password='secret',
+                password_2='secret',
+                email='newuser@domain.com'
+                ), follow_redirects=True).data)
+            response.append(self.client.post('/register', data=dict(
+                username='newuser',
+                password='secret',
+                password_2='supersecret',
+                email=''
+                ), follow_redirects=True).data)
+            for i in range(3):
+                self.assertIn(expected[i], response[i])
+
+    def testExistingUser(self):
+        expected = 'already taken'
+        with app.test_request_context():
+            response = self.client.post('/register', data=dict(
+                username='admin',
+                password='admin',
+                password_2='admin',
+                email='admin@domain.com'
+                ), follow_redirects=True).data
+            self.assertIn(expected, response)
+
+    def testExistingTempUser(self):
+        expected = 'already taken'
+        with app.test_request_context():
+            response = self.client.post('/register', data=dict(
+                username='temp',
+                password='admin',
+                password_2='admin',
+                email='temp@domain.com'
+                ), follow_redirects=True).data
+            self.assertIn(expected, response)
+
+    def testUnmatchedPasswords(self):
+        expected = 'make sure the passwords match'
+        with app.test_request_context():
+            response = self.client.post('/register', data=dict(
+                username='newuser',
+                password='secret',
+                password_2='supersecret',
+                email='newuser@domain.com'
+                ), follow_redirects=True).data
+            self.assertIn(expected, response)
+
+    def testInvalidEmail(self):
+        expected = 'valid email address'
+        test_post = [
+            '@gmail.com',
+            'newuser@gmail',
+            'gmail.com',
+            'newuseratgmail.com'
+        ]
+        with app.test_request_context():
+            for email in test_post:
+                response = self.client.post('/register', data=dict(
+                    username='newuser',
+                    password='secret',
+                    password_2='secret',
+                    email=email
+                    ), follow_redirects=True).data
+                self.assertIn(expected, response)
+
+    def testValidRegister(self):
+        expected = "Please check your email"
+        with app.test_request_context():
+            response = self.client.post('/register', data=dict(
+                username='newuser',
+                password='secret',
+                password_2='secret',
+                email='newuser@domain.com'
+                ), follow_redirects=True).data
+            self.assertIn(expected, response)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestRegisterUser(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        new_author = Author('admin', 'admin')
+        db.session.add(new_author)
+        temp_author = TempAuthor('temp', 'admin')
+        db.session.add(temp_author)
+        db.session.commit()
+
+    def testBlankForms(self):
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': 'newuser',
+                'first password': '',
+                'second password': None,
+                'email address': 'newuser@domain.com'
+                })
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': '',
+                'first password': 'secret',
+                'second password': 'secret',
+                'email address': 'newuser@domain.com'
+                })
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': 'newuser',
+                'first password': 'secret',
+                'second password': 'secret',
+                'email address': None
+                })
+
+    def testExistingUser(self):
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': 'admin',
+                'first password': 'admin',
+                'second password': 'admin',
+                'email address': 'admin@domain.com'
+                })
+
+    def testExistingTempUser(self):
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': 'temp',
+                'first password': 'admin',
+                'second password': 'admin',
+                'email address': 'temp@domain.com'
+                })
+
+    def testUnmatchedPasswords(self):
+        with self.assertRaises(ValueError):
+            register_user({
+                'username': 'newuser',
+                'first password': 'secret',
+                'second password': 'supersecret',
+                'email address': 'newuser@domain.com'
+                })
+
+    def testInvalidEmail(self):
+        test_post = [
+            '@gmail.com',
+            'newuser@gmail',
+            'gmail.com',
+            'newuseratgmail.com'
+        ]
+        for email in test_post:
+            with self.assertRaises(ValueError):
+                register_user({
+                    'username': 'newuser',
+                    'first password': 'secret',
+                    'second password': 'secret',
+                    'email address': email
+                    })
+
+    def testValid(self):
+        with app.test_request_context():
+            self.assertIsNone(register_user({
+                'username': 'newuser',
+                'first password': 'secret',
+                'second password': 'secret',
+                'email address': 'newuser@domain.com'
+                }))
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestEmail(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        self.client = app.test_client()
+
+    def testEmail(self):
+        with app.test_request_context():
+            expected = 'randomly_generated_registration_key'
+            with mail.record_messages() as outbox:
+                send_email('user@domain.com', 'randomly_generated_registration_key')
+            self.assertEqual(len(outbox), 1)
+            self.assertIn('user@domain.com', outbox[0].recipients)
+            self.assertIn(expected, outbox[0].body)
+            self.assertIn(expected, outbox[0].html)
+
+    def tearDown(self):
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestConfirmation(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        temp_author = TempAuthor('temp', 'admin')
+        self.reg_key = temp_author.reg_key
+        db.session.add(temp_author)
+        db.session.commit()
+
+    def testWrongKey(self):
+        expected = ("recognize the account", 'Click here to register')
+        with app.test_request_context():
+            response = self.client.get('/confirm/NotRandom').data
+            for elem in expected:
+                self.assertIn(elem, response)
+
+    def testRightKey(self):
+        expected = ('Congratulations, temp!', 'write your first post')
+        with app.test_request_context():
+            response = self.client.get('/confirm/%s' % self.reg_key).data
+            for elem in expected:
+                self.assertIn(elem, response)
+
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
+        os.close(self.db_fd)
+        os.unlink(app.config['DATABASE'])
+
+
+class TestUnTempUser(unittest.TestCase):
+    def setUp(self):
+        self.db_fd, app.config['DATABASE'] = tempfile.mkstemp()
+        app.config['TESTING'] = True
+        self.client = app.test_client()
+        db.create_all()
+        self.temp_author = TempAuthor('temp', 'admin')
+        db.session.add(self.temp_author)
+        db.session.commit()
+
+    def testUnTemp(self):
+        with app.test_request_context():
+            un_temp_user(self.temp_author)
+            newbie = Author.query.filter_by(username=self.temp_author.username).first()
+            self.assertIsNotNone(newbie)
+            oldie = TempAuthor.query.filter_by(username=self.temp_author.username).first()
+            self.assertIsNone(oldie)
 
     def tearDown(self):
         db.session.remove()

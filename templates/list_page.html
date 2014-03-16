@@ -4,7 +4,7 @@
 <h2>{{post.title}}</h2>
 <i>{{post.time}}</i>
 <p>{{post.body}}</p>
-<a href='post/'+{{post.id}}+'/'>Permalink</a>
+<a href='post/{{post.id}}'>Permalink</a>
 {% else %}
 <p>No posts to display</p>
 {% endfor %}

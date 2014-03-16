@@ -7,11 +7,14 @@ from flask import abort, request, render_template
 from flask import redirect, url_for, session, flash
 from flask.ext.seasurf import SeaSurf
 from flask.ext.bcrypt import Bcrypt
+import random
+import re
+from flask.ext.mail import Mail, Message
+import sys
 
 app = Flask(__name__)
-app.testing = True
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql:///microblog'
-app.config['SECRET_KEY'] = "IllNeverTell"
+app.config.from_pyfile('config.py')
+app.config.from_envvar('MICROBLOG_CONFIG', silent=True)
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
@@ -20,17 +23,20 @@ migrate = Migrate(app, db)
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 
+mail = Mail(app)
+
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(127))
+    title = db.Column(db.String(128))
     body = db.Column(db.Text)
     time = db.Column(db.DateTime)
     author_id = db.Column(db.Integer, db.ForeignKey('author.id'))
 
-    def __init__(self, title, body):
+    def __init__(self, title, body, auth_id):
         self.title = title
         self.body = body
+        self.author_id = auth_id
         self.time = datetime.utcnow()
 
     def __repr__(self):
@@ -39,8 +45,8 @@ class Post(db.Model):
 
 class Author(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(127))
-    password = db.Column(db.String(127))
+    username = db.Column(db.String(128))
+    password = db.Column(db.String(128))
     posts = db.relationship('Post', backref='author')
 
     def __init__(self, username, password):
@@ -51,10 +57,30 @@ class Author(db.Model):
         return '<Author %r>' % self.username
 
 
-def write_post(title, text):
-    new_post = Post(title, text)
+class TempAuthor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(128))
+    password = db.Column(db.String(128))
+    reg_key = db.Column(db.String(32))
+    time = db.Column(db.DateTime)
+
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.reg_key = random.randint(
+            1000000000000000,
+            9999999999999999
+            )
+        self.time = datetime.utcnow()
+
+
+def write_post(title, text, auth_id):
+    new_post = Post(title, text, auth_id)
     db.session.add(new_post)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except:
+        print sys.exc_info()[0]
 
 
 def read_posts():
@@ -86,7 +112,12 @@ def perma_view(id):
 def add_post():
     if request.method == 'POST':
         if session.get('logged_in', False):
-            write_post(request.form['post_title'], request.form['post_body'])
+            auth_id = Author.query.filter_by(username=session['user']).first().id
+            write_post(
+                request.form['post_title'],
+                request.form['post_body'],
+                auth_id
+                )
             return redirect(url_for('list_view'))
         else:
             flash("You must be logged in to perform this action.")
@@ -109,12 +140,13 @@ def login():
     return render_template('login_page.html')
 
 
-def login_user(username, password):
+def login_user(username, password, newly_confirmed=False):
     existing_author = Author.query.filter_by(username=username).first()
-    if existing_author is None:
-        raise ValueError
-    if not bcrypt.check_password_hash(existing_author.password, password):
-        raise ValueError
+    if not newly_confirmed:
+        if existing_author is None:
+            raise ValueError
+        if not bcrypt.check_password_hash(existing_author.password, password):
+            raise ValueError
     session['user'] = username
     session['logged_in'] = True
 
@@ -126,6 +158,82 @@ def logout():
     return redirect(url_for('list_view'))
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        try:
+            register_user({
+                'username': request.form['username'],
+                'first password': request.form['password'],
+                'second password': request.form['password_2'],
+                'email address': request.form['email']
+                })
+        except ValueError as e:
+            flash(str(e))
+            return redirect(url_for('register'))
+        flash("Great! You're well on your way! Please check your email")
+        return redirect(url_for('list_view'))
+    else:
+        return render_template('register.html')
+
+
+def register_user(info):
+    for k, v in info.iteritems():
+        if v is None or v == '':
+            raise ValueError("The %s is missing" % k)
+    extant_author = Author.query.filter_by(username=info['username']).first()
+    extant_temp = TempAuthor.query.filter_by(username=info['username']).first()
+    if extant_author is not None or extant_temp is not None:
+        raise ValueError("I'm sorry, that username is already taken.")
+    elif info['first password'] != info['second password']:
+        raise ValueError("Please make sure the passwords match and try again.")
+    elif not re.match(r"[^@]+@[^@]+\.[^@]+", info['email address']):
+        # Credit for the regex to StackOverflow user 'Thomas'
+        # http://stackoverflow.com/questions/8022530/python-check-for-valid-email-address
+        raise ValueError("Not a valid email address.")
+    temp_user = TempAuthor(info['username'], info['first password'])
+    db.session.add(temp_user)
+    db.session.commit()
+    send_email(info['email address'], temp_user.reg_key)
+
+
+def send_email(email, reg_key):
+    msg = Message(
+        "Subject",
+        sender='markcharyk@gmail.com',
+        recipients=[email])
+    msg.body = """Click the link below to confirm your registration!
+    /confirm/%s""" % reg_key
+    msg.html = """<b>Click the link below to confirm your registration!<br>
+    <a href="/confirm/%s">Confirm</a></b>""" % reg_key
+    mail.send(msg)
+
+
+@app.route('/confirm/<reg_key>')
+def confirm(reg_key):
+    try:
+        confirmed = TempAuthor.query.filter_by(reg_key=reg_key).first()
+    except:
+        confirmed = None
+    if confirmed is None:
+        flash("""Sorry!
+            We don't recognize the account you're trying to confirm.""")
+    else:
+        newbie = un_temp_user(confirmed)
+        flash("""Congratulations, %s!
+            You've been confirmed!""" % newbie.username)
+        login_user(confirmed.username, 'DoesntMatter', True)
+    return render_template('confirm.html')
+
+
+def un_temp_user(user):
+    new_author = Author(user.username, user.password)
+    db.session.delete(user)
+    db.session.add(new_author)
+    db.session.commit()
+    return new_author
+
+
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('not_found.html'), 404
@@ -133,7 +241,7 @@ def page_not_found(error):
 
 if __name__ == '__main__':
     db.create_all()
-    new_author = Author('newuser', 'secret')
-    db.session.add(new_author)
-    db.session.commit()
+    # new_author = Author('newuser', 'secret')
+    # db.session.add(new_author)
+    # db.session.commit()
     app.run()

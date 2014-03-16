@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% block body %}
+{% if session.logged_in %}
+<a href="/">Click here to head home</a>
+<a href="/new">Click here to write your first post</a>
+{% else %}
+<a href="/register">Click here to register</a>
+{% endif %}
+{% endblock %}

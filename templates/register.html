@@ -1,11 +1,13 @@
 {% extends "layout.html" %}
 {% block body %}
-    <form action="/login" method="POST">
+    <form action="/register" method="POST">
         Username: <input type="text" name="username"><br>
         Password: <input type="password" name="password"><br>
+        Confirm Password: <input type="password" name="password_2"><br>
+        Email Address: <input type="text" name="email"><br>
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-        <input type="submit" name="Login">
+        <input type="submit" name="Register">
     </form>
-<a href='/register'>Haven't registered for this blog? Why the heck not? Register here.</a>
+<a href='/login'>Already registered? Login here.</a>
 <a href="/">Home</a>
 {% endblock %}
