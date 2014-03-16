@@ -14,7 +14,7 @@ import sys
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
-app.config.from_envvar('MICROBLOG_CONFIG', silent=True)
+app.config.from_envvar('BLOG_SETTINGS', silent=True)
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
