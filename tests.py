@@ -5,7 +5,6 @@ from microblog import login_user, register_user, send_email, mail, un_temp_user
 from flask import session
 import tempfile
 import os
-os.environ['FLASK_MODE'] = os.getenv('FLASK_MODE') or 'testing'
 
 
 class TestWritePost(unittest.TestCase):
