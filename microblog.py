@@ -11,6 +11,7 @@ import random
 import re
 from flask.ext.mail import Mail, Message
 import sys
+from werkzeug.contrib.fixers import ProxyFix
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
@@ -24,6 +25,8 @@ manager = Manager(app)
 manager.add_command('db', MigrateCommand)
 
 mail = Mail(app)
+
+app.wsgi_app = ProxyFix(app.wsgi_app)
 
 
 class Post(db.Model):
@@ -241,7 +244,4 @@ def page_not_found(error):
 
 if __name__ == '__main__':
     db.create_all()
-    # new_author = Author('newuser', 'secret')
-    # db.session.add(new_author)
-    # db.session.commit()
     app.run()
