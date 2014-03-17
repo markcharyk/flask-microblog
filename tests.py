@@ -14,15 +14,17 @@ class TestWritePost(unittest.TestCase):
         db.session.add(new_author)
         db.session.commit()
         self.auth_id = new_author.id
+        self.auth_name = 'testauthor'
 
     def testWriteOne(self):
         expected = Post(u"First Post", u"""
-            The text containing the first post in the blog.""", self.auth_id)
+            The text containing the first post in the blog.""", self.auth_id, self.auth_name)
         write_post(u"First Post", u"""
-            The text containing the first post in the blog.""", self.auth_id)
+            The text containing the first post in the blog.""", self.auth_id, self.auth_name)
         actual = Post.query.filter_by(title=u'First Post').first()
         self.assertEqual(expected.title, actual.title)
         self.assertEqual(expected.body, actual.body)
+        self.assertEqual(expected.auth_name, actual.auth_name)
 
     def tearDown(self):
         db.session.remove()
@@ -36,16 +38,18 @@ class TestReadPosts(unittest.TestCase):
         db.session.add(new_author)
         db.session.commit()
         self.auth_id = new_author.id
+        self.auth_name = 'testauthor'
 
     def testReadOne(self):
         expected = Post(u"New Post", u"""
-            The text containing the newest post in the blog.""", self.auth_id)
+            The text containing the newest post in the blog.""", self.auth_id, self.auth_name)
         write_post(u"New Post", u"""
-            The text containing the newest post in the blog.""", self.auth_id)
+            The text containing the newest post in the blog.""", self.auth_id, self.auth_name)
         actual = read_posts()[0]
         self.assertEqual(expected.title, actual.title)
         self.assertEqual(expected.body, actual.body)
         self.assertEqual(self.auth_id, actual.author_id)
+        self.assertEqual(self.auth_name, actual.auth_name)
 
     def testEmpty(self):
         self.assertEqual(len(read_posts()), 0)
@@ -62,6 +66,7 @@ class TestReadPost(unittest.TestCase):
         db.session.add(new_author)
         db.session.commit()
         self.auth_id = new_author.id
+        self.auth_name = 'testauthor'
 
     def testEmpty(self):
         with self.assertRaises(IndexError):
@@ -69,7 +74,7 @@ class TestReadPost(unittest.TestCase):
 
     def testFirst(self):
         write_post(u"Newer Post", u"""
-            The text containing the newer post in the blog.""", self.auth_id)
+            The text containing the newer post in the blog.""", self.auth_id, self.auth_name)
         self.assertIsInstance(read_post(1), Post)
 
     def tearDown(self):
@@ -87,6 +92,7 @@ class TestListPage(unittest.TestCase):
         db.session.add(new_author)
         db.session.commit()
         self.auth_id = new_author.id
+        self.auth_name = 'testauthor'
 
     def testEmpty(self):
         with app.test_request_context():
@@ -96,18 +102,18 @@ class TestListPage(unittest.TestCase):
 
     def testOne(self):
         with app.test_request_context():
-            write_post(u"Post Title", u"A generic blog post", self.auth_id)
-            expected = ('Post Title', 'A generic blog post')
+            write_post(u"Post Title", u"A generic blog post", self.auth_id, self.auth_name)
+            expected = ('Post Title', 'A generic blog post', 'testauthor')
             response = self.client.get('/').data
             for elem in expected:
                 assert elem in response
 
     def testMany(self):
         with app.test_request_context():
-            write_post(u"Post Number One", u"Some text that makes up blog post number one", self.auth_id)
-            write_post(u"Post Number Two", u"Some text that makes up blog post number two", self.auth_id)
-            write_post(u"Post Number Three", u"Some text that makes up blog post number three", self.auth_id)
-            expected = ('Post Number One', 'Post Number Two', 'Post Number Three', 'Some text')
+            write_post(u"Post Number One", u"Some text that makes up blog post number one", self.auth_id, self.auth_name)
+            write_post(u"Post Number Two", u"Some text that makes up blog post number two", self.auth_id, self.auth_name)
+            write_post(u"Post Number Three", u"Some text that makes up blog post number three", self.auth_id, self.auth_name)
+            expected = ('Post Number One', 'Post Number Two', 'Post Number Three', 'Some text', 'testauthor')
             response = self.client.get('/').data
             for elem in expected:
                 assert elem in response
@@ -129,6 +135,7 @@ class TestPermaPage(unittest.TestCase):
         db.session.add(new_author)
         db.session.commit()
         self.auth_id = new_author.id
+        self.auth_name = 'testauthor'
 
     def testEmpty(self):
         with app.test_request_context():
@@ -139,18 +146,18 @@ class TestPermaPage(unittest.TestCase):
 
     def testOne(self):
         with app.test_request_context():
-            write_post(u"Single Post", u"Bloggity blog post, just one this time", self.auth_id)
-            expected = ('Single Post', 'Bloggity blog post, just one this time')
+            write_post(u"Single Post", u"Bloggity blog post, just one this time", self.auth_id, self.auth_name)
+            expected = ('Single Post', 'Bloggity blog post, just one this time', 'testauthor')
             response = self.client.get('/post/1').data
             for elem in expected:
                 assert elem in response
 
     def testMany(self):
         with app.test_request_context():
-            write_post(u"Post One", u"The first blog post in a list", self.auth_id)
-            write_post(u"Post Two", u"The second blog post in a list", self.auth_id)
-            write_post(u"Post Three", u"The third blog post in a list", self.auth_id)
-            expected = ('Post Three', 'The third blog post in a list')
+            write_post(u"Post One", u"The first blog post in a list", self.auth_id, self.auth_name)
+            write_post(u"Post Two", u"The second blog post in a list", self.auth_id, self.auth_name)
+            write_post(u"Post Three", u"The third blog post in a list", self.auth_id, self.auth_name)
+            expected = ('Post Three', 'The third blog post in a list', 'testauthor')
             response = self.client.get('/post/3').data
             for elem in expected:
                 self.assertIn(elem, response)
@@ -550,14 +557,14 @@ class TestConfirmation(unittest.TestCase):
         db.session.commit()
 
     def testWrongKey(self):
-        expected = ("recognize the account", 'Click here to register')
+        expected = ("recognize the account",)
         with app.test_request_context():
             response = self.client.get('/confirm/NotRandom').data
             for elem in expected:
                 self.assertIn(elem, response)
 
     def testRightKey(self):
-        expected = ('Congratulations, temp!', 'write your first post')
+        expected = ('Congratulations', 'head home')
         with app.test_request_context():
             response = self.client.get('/confirm/%s' % self.reg_key).data
             for elem in expected:

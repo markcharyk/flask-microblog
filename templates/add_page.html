@@ -4,13 +4,13 @@
     <form action="/new" method="POST">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         Title: <input type="text" name="post_title"><br>
-        Body: <input type="text" name="post_body"><br>
+        Body: <input type="textarea" name="post_body"><br>
         <input type="submit" name="Post!">
     </form>
 {% else %}
 <p>You must be logged in to perform this action</p>
-<a href='/login'>Log in</a>
-<a href='/register'>Haven't registered for this blog? Why the heck not? Register here.</a>
+<a href='/login'>Log in</a><br>
+<a href='/register'>Haven't registered for this blog? Why the heck not? Register here.</a><br>
 {% endif %}
 <a href='/'>Home</a>
 {% endblock %}

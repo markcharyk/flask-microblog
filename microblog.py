@@ -15,7 +15,6 @@ from werkzeug.contrib.fixers import ProxyFix
 
 app = Flask(__name__)
 app.config.from_pyfile('config.py')
-app.config.from_envvar('BLOG_SETTINGS', silent=True)
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
@@ -27,6 +26,7 @@ manager.add_command('db', MigrateCommand)
 mail = Mail(app)
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
+instance = 'http://ec2-54-186-73-177.us-west-2.compute.amazonaws.com'
 
 
 class Post(db.Model):
@@ -35,11 +35,13 @@ class Post(db.Model):
     body = db.Column(db.Text)
     time = db.Column(db.DateTime)
     author_id = db.Column(db.Integer, db.ForeignKey('author.id'))
+    auth_name = db.Column(db.String(128))
 
-    def __init__(self, title, body, auth_id):
+    def __init__(self, title, body, auth_id, auth_name):
         self.title = title
         self.body = body
         self.author_id = auth_id
+        self.auth_name = auth_name
         self.time = datetime.utcnow()
 
     def __repr__(self):
@@ -77,8 +79,8 @@ class TempAuthor(db.Model):
         self.time = datetime.utcnow()
 
 
-def write_post(title, text, auth_id):
-    new_post = Post(title, text, auth_id)
+def write_post(title, text, auth_id, auth_name):
+    new_post = Post(title, text, auth_id, auth_name)
     db.session.add(new_post)
     try:
         db.session.commit()
@@ -115,11 +117,12 @@ def perma_view(id):
 def add_post():
     if request.method == 'POST':
         if session.get('logged_in', False):
-            auth_id = Author.query.filter_by(username=session['user']).first().id
+            author = Author.query.filter_by(username=session['user']).first()
             write_post(
                 request.form['post_title'],
                 request.form['post_body'],
-                auth_id
+                author.id,
+                author.username
                 )
             return redirect(url_for('list_view'))
         else:
@@ -174,8 +177,9 @@ def register():
         except ValueError as e:
             flash(str(e))
             return redirect(url_for('register'))
-        flash("Great! You're well on your way! Please check your email")
-        return redirect(url_for('list_view'))
+        flash("""Great! You're well on your way! Please check your email
+            And then you can log in below""")
+        return redirect(url_for('login'))
     else:
         return render_template('register.html')
 
@@ -208,7 +212,7 @@ def send_email(email, reg_key):
     msg.body = """Click the link below to confirm your registration!
     /confirm/%s""" % reg_key
     msg.html = """<b>Click the link below to confirm your registration!<br>
-    <a href="/confirm/%s">Confirm</a></b>""" % reg_key
+    <a href="%s/confirm/%s">Confirm</a></b>""" % (instance, reg_key)
     mail.send(msg)
 
 
@@ -221,11 +225,11 @@ def confirm(reg_key):
     if confirmed is None:
         flash("""Sorry!
             We don't recognize the account you're trying to confirm.""")
+        return render_template('un-confirm.html')
     else:
-        newbie = un_temp_user(confirmed)
-        flash("""Congratulations, %s!
-            You've been confirmed!""" % newbie.username)
-        login_user(confirmed.username, 'DoesntMatter', True)
+        un_temp_user(confirmed)
+        flash("""Congratulations! You've been confirmed!
+            Please log in below""")
     return render_template('confirm.html')
 
 
@@ -234,7 +238,6 @@ def un_temp_user(user):
     db.session.delete(user)
     db.session.add(new_author)
     db.session.commit()
-    return new_author
 
 
 @app.errorhandler(404)
@@ -244,4 +247,4 @@ def page_not_found(error):
 
 if __name__ == '__main__':
     db.create_all()
-    app.run()
+    manager.run()
