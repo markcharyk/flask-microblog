@@ -14,7 +14,7 @@ import sys
 from werkzeug.contrib.fixers import ProxyFix
 
 app = Flask(__name__)
-app.config.from_pyfile('config.py')
+app.config.from_pyfile('deploy-config.py')
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
@@ -178,7 +178,7 @@ def register():
             flash(str(e))
             return redirect(url_for('register'))
         flash("""Great! You're well on your way! Please check your email
-            And then you can log in below""")
+            and then you can log in below""")
         return redirect(url_for('login'))
     else:
         return render_template('register.html')
@@ -247,4 +247,4 @@ def page_not_found(error):
 
 if __name__ == '__main__':
     db.create_all()
-    manager.run()
+    app.run()
