@@ -14,7 +14,7 @@ import sys
 from werkzeug.contrib.fixers import ProxyFix
 
 app = Flask(__name__)
-app.config.from_pyfile('deploy-config.py')
+app.config.from_pyfile('config.py')
 db = SQLAlchemy(app)
 csrf = SeaSurf(app)
 bcrypt = Bcrypt(app)
