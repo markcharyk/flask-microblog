@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block body %}
 {% if session.logged_in %}
-    <form action="/new" method="POST">
+    <form action="/new" method="POST" id="new-post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         Title: <br>
         <input type="text" name="post_title"><br>

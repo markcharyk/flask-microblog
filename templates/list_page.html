@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 {% block body %}
-<div id='posts'>
 {% for post in list %}
 <div class='post'>
     <h2 class='post-title'><a href='post/{{post.id}}'>{{post.title}}</a></h2>
@@ -11,5 +10,4 @@
 {% else %}
 <p>No posts to display</p>
 {% endfor %}
-</div>
 {% endblock %}

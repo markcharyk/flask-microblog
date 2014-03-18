@@ -26,7 +26,7 @@ manager.add_command('db', MigrateCommand)
 mail = Mail(app)
 
 app.wsgi_app = ProxyFix(app.wsgi_app)
-instance = 'http://ec2-54-186-73-177.us-west-2.compute.amazonaws.com'
+instance = 'http://ec2-54-186-148-82.us-west-2.compute.amazonaws.com'
 
 
 class Post(db.Model):

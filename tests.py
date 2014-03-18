@@ -180,13 +180,6 @@ class TestAddPost(unittest.TestCase):
         db.session.commit()
         self.auth_id = new_author.id
 
-    def testWithGet(self):
-        with app.test_request_context():
-            expected1 = 'input type="text"'
-            expected2 = "Haven't registered"
-            response = self.client.get('/new').data
-            assert expected1 in response or expected2 in response
-
     def testPostNotLoggedIn(self):
         expected = ('must be logged in', )
         with app.test_request_context():
