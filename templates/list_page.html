@@ -1,13 +1,15 @@
 {% extends "layout.html" %}
 {% block body %}
-<a href='/new'>Write a new post</a><br>
+<div id='posts'>
 {% for post in list %}
-<h2>{{post.title}}</h2>
-<h6>by {{post.auth_name}}</h6>
-<i>{{post.time}}</i>
-<p>{{post.body}}</p>
-<a href='post/{{post.id}}'>Permalink</a>
+<div class='post'>
+    <h2 class='post-title'><a href='post/{{post.id}}'>{{post.title}}</a></h2>
+    <p class='tiny'>by {{post.auth_name}}</p>
+    <i class='tiny'>{{post.time}}</i>
+    <p>{{post.body}}</p>
+</div>
 {% else %}
 <p>No posts to display</p>
 {% endfor %}
+</div>
 {% endblock %}

@@ -1,0 +1,50 @@
+body {
+    background: #E6E6FF;
+    overflow: hidden;
+}
+#logged-in {
+    font-size:15px;
+    text-align: right;
+}
+#bodies {
+    overflow-y: scroll;
+}
+#sidebar {
+    float: left;
+    width: 200px;
+    min-height: 100%;
+    margin-bottom: 5000px;
+    padding-bottom: 5000px;
+    overflow: hidden;
+}
+#flash, .post {
+    border-radius: 30px;
+}
+#flash {
+    text-align: right;
+    min-width: 100%;
+    font-size: 18px;
+}
+.post {
+    background: #FFFFFF;
+    padding: 10px;
+    margin-top: 10px;
+    float: left;
+    min-width: 80%;
+    border-style: dashed;
+}
+.post-title a:link {COLOR:black;}
+.post-title a:visited {COLOR:black;}
+.post-title a:hover {COLOR:black;}
+.post-title a:link {text-decoration:none;}
+.post-title a:visited {text-decoration:none;}
+.post-title a:hover {text-decoration:none;}
+.post-title{
+    font-size: 20px;
+}
+.tiny {
+    font-size: 8px;
+}
+#body-box {
+    height: 250px;
+}

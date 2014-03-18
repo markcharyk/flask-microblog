@@ -3,14 +3,16 @@
 {% if session.logged_in %}
     <form action="/new" method="POST">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-        Title: <input type="text" name="post_title"><br>
-        Body: <input type="textarea" name="post_body"><br>
+        Title: <br>
+        <input type="text" name="post_title"><br>
+        Body: <br>
+        <input type="textarea" name="post_body" id='body-box'><br>
         <input type="submit" name="Post!">
     </form>
 {% else %}
-<p>You must be logged in to perform this action</p>
-<a href='/login'>Log in</a><br>
-<a href='/register'>Haven't registered for this blog? Why the heck not? Register here.</a><br>
+<div class='post'>
+    <p>You must be logged in to perform this action</p><br>
+    <p>You can take the first step using the links in the top right!</p>
+</div>
 {% endif %}
-<a href='/'>Home</a>
 {% endblock %}

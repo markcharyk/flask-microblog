@@ -1,9 +1,9 @@
 {% extends "layout.html" %}
 {% block body %}
-<h2>{{post.title}}</h2>
-<h6>by {{post.auth_name}}</h6>
-<p>{{post.time}}</p>
-<p>{{post.body}}</p><br>
-<a href='/new'>Write a new post</a><br>
-<a href="/">Back to home</a>
+<div class='post'>
+    <h2 class='post-title'><a href='{{post.id}}'>{{post.title}}</a></h2>
+    <p class='tiny'>by {{post.auth_name}}<p>
+    <i class='tiny'>{{post.time}}</i>
+    <p>{{post.body}}</p>
+</div>
 {% endblock %}
